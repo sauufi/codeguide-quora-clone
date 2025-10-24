@@ -1,179 +1,173 @@
-# Backend Structure Document
-
-This document outlines the backend architecture, hosting, and infrastructure for the **codeguide-starter** project. It uses plain language so anyone can understand how the backend is set up and how it supports the application.
+# Backend Structure Document for codeguide-quora-clone
 
 ## 1. Backend Architecture
 
-- **Framework and Design Pattern**
-  - We use **Next.js API Routes** to handle all server-side logic. These routes live alongside the frontend code in the same repository, making development and deployment simpler.
-  - The backend follows a **layered pattern**:
-    1. **API Layer**: Receives requests (login, registration, data fetch).  
-    2. **Service Layer**: Contains the core business logic (user validation, password hashing).  
-    3. **Data Access Layer**: Talks to the database via a simple ORM (e.g., Prisma or TypeORM).
+Our backend is built on the Next.js framework, using its API Routes feature to handle all server-side logic. The core design follows a simple yet powerful flow:
 
-- **Scalability**
-  - Stateless API routes can scale horizontally—new instances can spin up on demand.  
-  - We can add caching or a message queue (e.g., Redis or RabbitMQ) without changing the core code.
+- **API Routes (Next.js)** handle incoming HTTP requests (GET, POST, PUT, DELETE).  
+- **Authentication Layer (Better Auth)** secures endpoints and manages user sessions.  
+- **Data Access Layer (Drizzle ORM)** provides type-safe interactions with PostgreSQL.  
 
-- **Maintainability**
-  - Code for each feature is grouped by route (authentication, dashboard).  
-  - A service layer separates complex logic from request handling.
+This setup leverages the best of server-side rendering (SSR) and API-driven design. Key benefits:
 
-- **Performance**
-  - Lightweight Node.js handlers keep response times low.  
-  - Future use of database connection pooling and Redis for caching repeated queries.
+- **Scalability**: Docker containers let you spin up more instances easily. Next.js handles routing and can scale horizontally.  
+- **Maintainability**: Clear separation between routes, database logic, and authentication makes it easy to update or extend features.  
+- **Performance**: Server components in Next.js render pages quickly on the server. Drizzle’s type-safe queries reduce runtime errors.
 
 ## 2. Database Management
 
-- **Database Choice**
-  - We recommend **PostgreSQL** for structured data and reliable transactions.  
-  - In-memory caching can be added later with **Redis** for session tokens or frequently read data.
+We use PostgreSQL (a relational SQL database) paired with Drizzle ORM:
 
-- **Data Storage and Access**
-  - Use an ORM like **Prisma** or **TypeORM** to map JavaScript/TypeScript objects to database tables.
-  - Connection pooling ensures efficient use of database connections under load.
-  - Migrations track schema changes over time, keeping development, staging, and production in sync.
+- PostgreSQL stores structured Q&A data reliably.  
+- Drizzle ORM maps TypeScript models to SQL tables, ensuring queries match the schema exactly.  
+- Drizzle Kit handles database migrations, keeping schema changes in sync across environments.
 
-- **Data Practices**
-  - Passwords are never stored in plain text—they are salted and hashed with **bcrypt** before saving.
-  - All outgoing data is typed and validated to prevent malformed records.
+Data practices:
+
+- **Migrations**: Version-controlled SQL migrations via Drizzle Kit.  
+- **Backups**: Daily database snapshots on the managed cloud provider (e.g., AWS RDS or DigitalOcean Managed Databases).  
+- **Indexing**: We add indexes on foreign keys and searchable text columns to speed up lookups.
 
 ## 3. Database Schema
 
-### Human-Readable Format
+Below is the SQL schema for our key tables. It’s written in standard PostgreSQL syntax:
 
-- **Users**
-  - **id**: Unique identifier  
-  - **email**: User’s email address (unique)  
-  - **password_hash**: Securely hashed password  
-  - **created_at**: Account creation timestamp
-
-- **Sessions**
-  - **id**: Unique session record  
-  - **user_id**: Links to a user  
-  - **token**: Random string for authentication  
-  - **expires_at**: When the token stops working  
-  - **created_at**: When the session was created
-
-- **DashboardItems** *(optional for dynamic data)*
-  - **id**: Unique record  
-  - **title**: Item title  
-  - **content**: Item details  
-  - **created_at**: When the item was added
-
-### SQL Schema (PostgreSQL)
 ```sql
--- Users table
+-- Users table (from Better Auth)
 CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
+  id UUID PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Sessions table
-CREATE TABLE sessions (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Dashboard items table
-CREATE TABLE dashboard_items (
-  id SERIAL PRIMARY KEY,
+-- Questions table
+CREATE TABLE questions (
+  id UUID PRIMARY KEY,
   title TEXT NOT NULL,
-  content TEXT,
+  content TEXT NOT NULL,
+  author_id UUID REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT now()
 );
-```  
+
+-- Answers table
+CREATE TABLE answers (
+  id UUID PRIMARY KEY,
+  content TEXT NOT NULL,
+  question_id UUID REFERENCES questions(id),
+  author_id UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Votes table (for both questions and answers)
+CREATE TABLE votes (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  target_type TEXT NOT NULL CHECK (target_type IN ('question','answer')),
+  target_id UUID NOT NULL,
+  vote_value SMALLINT NOT NULL CHECK (vote_value IN (1,-1)),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (user_id, target_type, target_id)
+);
+
+-- Topics (tags) table
+CREATE TABLE topics (
+  id UUID PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  slug TEXT UNIQUE NOT NULL
+);
+
+-- Join table between questions and topics
+CREATE TABLE question_topics (
+  question_id UUID REFERENCES questions(id),
+  topic_id UUID REFERENCES topics(id),
+  PRIMARY KEY (question_id, topic_id)
+);
+
+-- Comments table (nested discussions on answers)
+CREATE TABLE comments (
+  id UUID PRIMARY KEY,
+  content TEXT NOT NULL,
+  answer_id UUID REFERENCES answers(id),
+  author_id UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
 
 ## 4. API Design and Endpoints
 
-- **Approach**: We follow a **RESTful** style, grouping related endpoints under `/api` directories.
+We follow a RESTful approach using Next.js API Routes under `/app/api`:
 
-- **Key Endpoints**
-  - `POST /api/auth/register`  
-    • Accepts `{ email, password }`  
-    • Creates a new user and issues a session token  
-  - `POST /api/auth/login`  
-    • Accepts `{ email, password }`  
-    • Verifies credentials and returns a session token  
-  - `POST /api/auth/logout`  
-    • Invalidates the session token on the server  
-  - `GET /api/dashboard/data`  
-    • Requires a valid session  
-    • Returns user-specific data or dashboard items  
+- **/api/auth/**: Handles sign-up, sign-in, and session management (Better Auth).  
+- **/api/questions**
+  - GET /api/questions: List all questions or filter by topic.  
+  - POST /api/questions: Create a new question (authenticated).  
+  - GET /api/questions/[id]: Fetch a single question with its answers and vote counts.  
+  - PUT /api/questions/[id]: Update a question (author only).  
+  - DELETE /api/questions/[id]: Remove a question (author or moderator).
 
-- **Communication**
-  - Frontend sends JSON requests; backend replies with JSON and appropriate HTTP status codes.  
-  - Protected routes check for a valid session token (in cookies or Authorization header).
+- **/api/answers**
+  - POST /api/answers: Add an answer to a question.  
+  - PUT /api/answers/[id]: Edit an answer.  
+  - DELETE /api/answers/[id]: Delete an answer.
+
+- **/api/votes**
+  - POST /api/votes: Cast or change a vote on a question or answer.  
+  - DELETE /api/votes/[id]: Remove a vote.
+
+- **/api/topics**
+  - GET /api/topics: List all topics.  
+  - POST /api/topics: Create a new topic (admin/moderator).
+
+- **/api/comments**
+  - POST /api/comments: Add a comment to an answer.  
+  - DELETE /api/comments/[id]: Remove a comment.
+
+Every endpoint validates input (using Zod or similar) and checks permissions via Better Auth session data.
 
 ## 5. Hosting Solutions
 
-- **Cloud Provider**:  
-  - **Vercel** (recommended) offers seamless Next.js deployments, auto-scaling, and built-in CDN.  
-  - Alternatively, **Netlify** or any Node.js-capable host will work.
-
-- **Benefits**
-  - **Reliability**: Global servers and failover across regions.  
-  - **Scalability**: Auto-scale serverless functions based on traffic.  
-  - **Cost-Effectiveness**: Pay-per-use model means low cost for small projects.
+- **Containerized Deployment (Docker)**: Ensures consistent environments from development to production.  
+- **Cloud Provider**: Deploy on platforms like Vercel (for Next.js functions) and a managed PostgreSQL service (AWS RDS, DigitalOcean).  
+- **Benefits**:
+  - Reliability: Managed databases offer automated backups and failover.  
+  - Scalability: Docker images can be replicated behind a load balancer.  
+  - Cost-effectiveness: Pay-as-you-go serverless functions (Vercel) and managed databases reduce ops overhead.
 
 ## 6. Infrastructure Components
 
-- **Load Balancer**
-  - Provided by the hosting platform—distributes API requests across function instances.
-
-- **CDN (Content Delivery Network)**
-  - Vercel’s global edge network caches static assets (CSS, JS, images) for faster page loads.
-
-- **Caching**
-  - **Redis** (optional) for session storage or caching dashboard queries to reduce database load.
-
-- **Object Storage**
-  - For file uploads or backups, integrate with AWS S3 or similar services.
-
-- **Message Queue**
-  - In future, use **RabbitMQ** or **Kafka** for background tasks (e.g., email notifications).
+- **Load Balancer**: Distributes traffic across multiple Next.js instances (e.g., AWS ELB or Vercel’s global edge network).  
+- **CDN**: Vercel’s built-in CDN or CloudFront to cache static assets and server-rendered pages.  
+- **Caching Layer**: Optionally use Redis for session caching or to store hot data (e.g., popular questions).  
+- **Content Delivery**: Static assets (images, CSS) served via CDN for low latency.  
+- **Migration Tool**: Drizzle Kit manages SQL migrations across dev, staging, and production.
 
 ## 7. Security Measures
 
-- **Authentication & Authorization**
-  - Passwords hashed with **bcrypt** and salted.  
-  - Session tokens stored in secure, HttpOnly cookies or Authorization headers.  
-  - Protected endpoints verify tokens before proceeding.
-
-- **Data Encryption**
-  - **HTTPS/TLS** encrypts data in transit.  
-  - Database connections use SSL to encrypt data between the app and the database.
-
-- **Input Validation**
-  - Every incoming request is validated (e.g., valid email format, password length) to prevent SQL injection or other attacks.
-
-- **Web Security Best Practices**
-  - Enable **CORS** policies to limit allowed origins.  
-  - Use **CSRF tokens** or same-site cookies to prevent cross-site requests.  
-  - Set secure headers with **Helmet** or a similar middleware.
+- **Authentication**: Better Auth handles secure sign-in, sign-up, and session tokens.  
+- **Authorization**: Middleware checks user roles (author, moderator, admin) before allowing edits or deletes.  
+- **Input Validation**: All API payloads validated with a schema library (Zod) to prevent XSS and SQL injection.  
+- **Encryption**:
+  - In transit: TLS (HTTPS) on all requests.  
+  - At rest: Database provider encrypts data automatically.  
+- **HTTP Security**: Set secure headers (Content Security Policy, X-Frame-Options) via a middleware like `helmet`.
 
 ## 8. Monitoring and Maintenance
 
-- **Performance Monitoring**
-  - Integrate **Sentry** or **LogRocket** for real-time crash reporting and performance tracing.  
-  - Use Vercel’s built-in analytics to track request latencies and error rates.
-
-- **Logging**
-  - Structured logs (JSON) for all API requests and errors, shipped to a log management service like **Datadog** or **Logflare**.
-
-- **Health Checks**
-  - Define a `/health` endpoint that returns a 200 status if the service is up and the database is reachable.
-
-- **Maintenance Strategies**
-  - Automated migrations run on deploy to keep the database schema up to date.  
-  - Scheduled dependency audits and security scans (e.g., `npm audit`).
-  - Regular backups of the database (daily or weekly depending on usage).
+- **Error Tracking**: Sentry captures runtime exceptions and performance bottlenecks.  
+- **Logging**: Structured logs (JSON) sent to a central logging service (e.g., Datadog, Logflare).  
+- **Metrics**: Prometheus + Grafana or a managed alternative (Datadog) for CPU, memory, request latency.  
+- **Health Checks**: Automated endpoint pings to ensure API routes are responsive.  
+- **Database Maintenance**: Regular vacuuming and index analysis on PostgreSQL (managed by provider).  
+- **CI/CD**: GitHub Actions runs tests, builds Docker images, and deploys on merge to main.
 
 ## 9. Conclusion and Overall Backend Summary
 
-The backend for **codeguide-starter** is built on Next.js API Routes and Node.js, paired with PostgreSQL for data and optional Redis for caching. It follows a clear layered architecture that keeps code easy to maintain and extend. With RESTful endpoints for authentication and data, secure practices like password hashing and HTTPS, and hosting on Vercel for scalability and global performance, this setup meets the project’s goals for a fast, secure, and developer-friendly foundation. Future enhancements—such as background job queues, advanced monitoring, or richer data models—can be added without disrupting the core structure.
+This backend structure is built to support a full-featured Quora-like platform from day one. By combining Next.js API Routes, Better Auth, Drizzle ORM, and PostgreSQL, we achieve:
+
+- **Rapid feature development** with type-safe database access and modular API routes.  
+- **High performance** through server-side rendering and CDN caching.  
+- **Robust security** with validated input, encrypted channels, and role-based access.  
+- **Operational simplicity** via Docker, managed cloud services, and automated monitoring.
+
+The clear separation of concerns and use of modern tools ensures the backend can grow with user demands, handle high traffic, and keep maintenance overhead low. This setup provides a rock-solid foundation for implementing advanced features like reputation scoring, full-text search, and AI-powered recommendations in the future.

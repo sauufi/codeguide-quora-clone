@@ -1,90 +1,130 @@
-# Tech Stack Document
+# Tech Stack Document for codeguide-quora-clone
 
-This document explains the key technologies chosen for the **codeguide-starter** project. It’s written in everyday language so anyone—technical or not—can understand why each tool was picked and how it supports the application.
+This document explains, in simple terms, the technology choices behind your Quora-style Q&A platform. Each section covers why we picked these tools and how they work together to give you a solid, scalable, and user-friendly foundation.
 
 ## 1. Frontend Technologies
-The frontend is everything the user sees and interacts with. For this project, we’ve used:
 
-- **Next.js (App Router)**
-  - A React framework that makes page routing, server-side rendering, and API routes very simple.
-  - Enhances user experience by pre-rendering pages on the server or at build time, leading to faster initial load.
-- **React 18**
-  - The underlying library for building user interfaces with reusable components.
-  - Provides a smooth, interactive experience thanks to its virtual DOM and modern hooks.
-- **TypeScript**
-  - A superset of JavaScript that adds types (labels for data).
-  - Helps catch errors early during development and makes the code easier to maintain.
-- **CSS (globals.css & theme.css)**
-  - **globals.css** applies base styles (fonts, colors, resets) across the entire app.
-  - **dashboard/theme.css** defines the look and feel specific to the dashboard area.
-  - This separation keeps styles organized and avoids accidental style conflicts.
+We chose modern, type-safe, and component-driven tools to build a fast and attractive user interface.
 
-By combining these tools, we have a clear structure (Next.js folders for pages and layouts), safer code (TypeScript), and flexible styling with vanilla CSS.
+• Next.js (App Router)
+  - Handles page routing, server-side rendering (SSR), and static site generation (SSG).
+  - Improves SEO so your public questions and answers get indexed by search engines.
+
+• TypeScript
+  - Adds type checking to JavaScript, reducing bugs in data handling (users, questions, answers).
+  - Works across frontend and backend for consistent code.
+
+• Radix UI & shadcn/ui
+  - A set of unstyled, accessible UI components (dialogs, cards, menus, etc.).
+  - Lets you build custom, consistent elements like question cards and modals quickly.
+
+• Tailwind CSS v4
+  - Utility-first CSS framework that speeds up styling.
+  - Ensures a consistent look across feeds, forms, and sidebars without writing custom CSS from scratch.
+
+• Testing Tools (recommended)
+  - **Playwright** or **Cypress** for end-to-end tests simulating real user flows (asking, answering, voting).
 
 ## 2. Backend Technologies
-The backend handles data, user accounts, and the logic behind the scenes. Our choices here are:
 
-- **Next.js API Routes**
-  - Allows us to write server-side code (`route.ts` files) alongside our frontend in the same project.
-  - Runs on Node.js, so we can handle requests like sign-up, sign-in, and data fetching in one place.
-- **Node.js Runtime**
-  - The JavaScript environment on the server that executes our API routes.
-- **bcrypt** (npm package)
-  - A library for hashing passwords securely before storing them.
-  - Ensures that even if someone got access to our data, raw passwords aren’t visible.
-- **(Optional) NextAuth.js or JWT**
-  - While this starter kit shows a custom authentication flow, it can easily integrate services like NextAuth.js for email-based login or JWT (JSON Web Tokens) for stateless sessions.
+The backend powers data storage, business logic, and secure user actions.
 
-These components work together to receive user credentials, verify or store them securely, manage sessions or tokens, and deliver protected data back to the frontend.
+• Next.js API Routes
+  - Let you write serverless functions right in the same project folder structure.
+  - Handle actions like creating questions, posting answers, and casting votes.
+
+• Better Auth
+  - Provides user sign-up, sign-in, password recovery, and session management.
+  - Ensures only authenticated users can ask, answer, or vote.
+
+• Drizzle ORM
+  - A type-safe database toolkit for defining schemas and running queries.
+  - Prevents common errors by matching your code models to your database tables.
+
+• Drizzle Kit (Database Migrations)
+  - Automatically generates and runs SQL migration files as you evolve your schema.
+  - Keeps your database structure in sync across development, staging, and production.
+
+• PostgreSQL
+  - A powerful relational database that handles complex queries and joins (e.g., fetching a question with its answers and vote counts).
+  - Supports full-text search if you prefer an all-in-one solution.
+
+• Input Validation: Zod (recommended)
+  - Validates and sanitizes all user inputs (questions, answers, comments).
+  - Protects against invalid data and common security issues like XSS.
 
 ## 3. Infrastructure and Deployment
-Infrastructure covers where and how we host the app, as well as how changes get delivered:
 
-- **Git & GitHub**
-  - Version control system (Git) and remote hosting (GitHub) keep track of all code changes and allow team collaboration.
-- **Vercel (or Netlify)**
-  - A popular hosting service optimized for Next.js, with one-click deployments and global content delivery.
-  - Automatically rebuilds and deploys the site whenever code is pushed to the main branch.
-- **GitHub Actions (CI/CD)**
-  - Automates tasks like linting (ESLint), formatting (Prettier), and running any tests you add.
-  - Ensures that only clean, tested code goes live.
+These choices ensure your app stays reliable, scalable, and easy to maintain.
 
-Together, these tools provide a reliable, scalable setup where every code change is tested and deployed quickly, with minimal manual work.
+• Docker
+  - Containerizes your application and database into reproducible environments.
+  - Simplifies moving from local development to staging or production.
+
+• Next.js Standalone Build
+  - Produces lightweight, self-contained server code for faster startup and smaller Docker images.
+
+• Version Control: Git (GitHub/GitLab)
+  - Tracks code changes and lets multiple developers collaborate safely.
+
+• CI/CD Pipelines
+  - Automate testing, building, and deployment (e.g., GitHub Actions).
+  - Ensures every change is tested and deployed consistently.
+
+• Database Migrations with Drizzle Kit
+  - Keeps your PostgreSQL schema updated across all environments.
+
+• Error Monitoring: Sentry (recommended)
+  - Captures runtime errors and performance issues in production.
+  - Sends alerts so you can quickly fix bugs impacting real users.
 
 ## 4. Third-Party Integrations
-While this starter kit is minimal by design, it already includes or can easily add:
 
-- **bcrypt**
-  - For secure password hashing (included as an npm dependency).
-- **NextAuth.js** (optional)
-  - A full-featured authentication library supporting email/password, OAuth, and more.
-- **Sentry or LogRocket** (optional)
-  - For real-time error tracking and performance monitoring in production.
+We integrate a few external services to handle specialized tasks and speed up development.
 
-These integrations help extend the app’s capabilities without building every feature from scratch.
+• Payment Processors (future scope)
+  - Stripe or PayPal can be added if you introduce paid features, like premium answers or ad-free browsing.
+
+• Search Services
+  - **PostgreSQL full-text search** (built-in) or **Algolia** (hosted search) for fast, relevance-ranked question lookup.
+
+• Analytics
+  - Google Analytics or Plausible to track user behavior, popular topics, and engagement metrics.
+
+• Error Tracking: Sentry
+  - Monitors exceptions and performance bottlenecks in your frontend and backend.
 
 ## 5. Security and Performance Considerations
-We’ve baked in several measures to keep users safe and the app running smoothly:
 
-Security:
-- Passwords are never stored in plain text—bcrypt hashes them with a random salt.
-- API routes can implement CSRF protection and input validation to block malicious requests.
-- Session tokens or cookies are marked secure and HttpOnly to prevent theft via JavaScript.
+We’ve built in measures to keep data safe and pages fast.
 
-Performance:
-- Server-side rendering (SSR) and static site generation (SSG) in Next.js deliver pages faster.
-- Code splitting and lazy-loaded components ensure users only download what they need.
-- Global CSS and theme files are small and cached by the browser for quick repeat visits.
+• Authentication & Authorization
+  - Better Auth for secure sign-in flows and session handling.
+  - Server-side checks in Next.js API Routes to ensure only authorized actions succeed.
 
-These strategies work together to give users a fast, secure experience every time.
+• Data Protection
+  - Input validation with Zod to prevent malformed data and injection attacks.
+  - HTTPS everywhere—encrypt data in transit.
+
+• Performance Optimizations
+  - Server Components in Next.js: render pages on the server for faster initial load.
+  - Lazy loading of non-critical components and images.
+  - Caching strategies (HTTP caching, incremental static regeneration) to reduce server load and speed up repeat visits.
 
 ## 6. Conclusion and Overall Tech Stack Summary
-In building **codeguide-starter**, we chose technologies that:
 
-- Align with modern web standards (Next.js, React, TypeScript).
-- Provide a clear, file-based project structure for rapid onboarding.
-- Offer built-in support for server-side rendering, API routes, and static assets.
-- Emphasize security through password hashing, session management, and safe defaults.
-- Enable easy scaling and future enhancements via modular code and optional integrations.
+You now have a quick overview of the carefully chosen tools that power your Quora-style platform:
 
-This stack strikes a balance between simplicity for newcomers and flexibility for experienced teams. It accelerates development of a secure authentication flow and a polished dashboard, while leaving room to plug in databases, test suites, and advanced features as the project grows.
+• Frontend: Next.js (App Router), TypeScript, Radix UI & shadcn/ui, Tailwind CSS
+• Backend: Next.js API Routes, Better Auth, Drizzle ORM & Drizzle Kit, PostgreSQL, Zod
+• Infrastructure: Docker, Next.js Standalone Build, Git + CI/CD, Sentry
+• Integrations: Algolia or Postgres full-text search, analytics (Google Analytics/Plausible), payment gateways (Stripe/PayPal in future)
+
+These choices align with your goals of building a feature-rich, scalable, and secure Q&A platform. They give you:
+
+• A modular codebase that’s easy to extend with question/answer schemas, voting logic, and topic tagging.
+• Fast page loads and strong SEO support for public content.
+• Robust security and data integrity.
+• Smooth development and deployment workflows.
+
+With this foundation in place, you can focus on adding your unique features—like reputation scoring, advanced moderation tools, and interactive topic browsing—to deliver a standout Q&A experience. Good luck building your next Quora-style platform!
